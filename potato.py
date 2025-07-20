@@ -22,10 +22,15 @@ class GrowthStage(Enum):
     SEED = "seed"
     GERMINATION = "germination" 
     SPROUTING = "sprouting"
+    EARLY_VEGETATIVE = "early_vegetative"
     VEGETATIVE = "vegetative"
+    ROOT_DEVELOPMENT = "root_development"
     FLOWERING = "flowering"
+    EARLY_TUBER = "early_tuber"
     TUBER_FORMATION = "tuber_formation"
+    TUBER_BULKING = "tuber_bulking"
     MATURITY = "maturity"
+    HARVEST_READY = "harvest_ready"
 
 
 @dataclass
@@ -57,38 +62,100 @@ class PotatoArt:
         """Load default ASCII patterns for each growth stage"""
         patterns = {
             GrowthStage.SEED: [
-                "·"
+                "●"
             ],
             GrowthStage.GERMINATION: [
-                "·",
-                "┴"
+                "╱",
+                "●",
+                "░"
             ],
             GrowthStage.SPROUTING: [
-                " │",
-                "·┴"
+                " |",
+                " |",
+                "●",
+                "░░"
+            ],
+            GrowthStage.EARLY_VEGETATIVE: [
+                " |",
+                " |",
+                " |",
+                "●●",
+                "░░░"
             ],
             GrowthStage.VEGETATIVE: [
-                " ┌┐",
-                " ││",
-                "·┴┴"
+                "\\|/",
+                " | ",
+                " | ",
+                "●●●",
+                "░░░░"
+            ],
+            GrowthStage.ROOT_DEVELOPMENT: [
+                "\\|/",
+                " | ",
+                " | ",
+                "●●●",
+                "░╱╲░",
+                "░░░░░"
             ],
             GrowthStage.FLOWERING: [
-                " ❀❀",
-                " ┌┐",
-                " ││",
-                "·┴┴"
+                "❀ ❀ ❀",
+                " \\|/ ",
+                "  |  ",
+                "  |  ",
+                " ●●● ",
+                "░╱░╲░",
+                "░░░░░░"
+            ],
+            GrowthStage.EARLY_TUBER: [
+                "❀ ❀ ❀",
+                " \\|/ ",
+                "  |  ",
+                "  |  ",
+                " ●●● ",
+                "░╱○╲░",
+                "░░░░░░"
             ],
             GrowthStage.TUBER_FORMATION: [
-                " ❀❀",
-                " ┌┐",
-                " ││",
-                "○┴┴○"
+                "❀ ❀ ❀",
+                " \\|/ ",
+                "  |  ",
+                "  |  ",
+                "●●●●●",
+                "░╱○○╲░",
+                "░░░░░░░"
+            ],
+            GrowthStage.TUBER_BULKING: [
+                "❀ ❀ ❀",
+                " \\|/ ",
+                "  |  ",
+                "  |  ",
+                "●●●●●",
+                "░╱●●╲░",
+                "░○●●○░",
+                "░░░░░░░"
             ],
             GrowthStage.MATURITY: [
-                " ❀❀❀",
-                " ┌─┐",
-                " │ │",
-                "●┴─┴●"
+                "  ❀   ❀   ❀  ",
+                "   \\ | /   ",
+                "    \\|/    ",
+                "     |     ",
+                "     |     ",
+                "   ●●●●●   ",
+                "  ░╱●●●╲░  ",
+                "  ░○●●●○░  ",
+                "  ░░░░░░░  "
+            ],
+            GrowthStage.HARVEST_READY: [
+                "     ❀     ",
+                "   \\ | /   ",
+                "    \\|/    ",
+                "     |     ",
+                "     |     ",
+                "   ●●●●●   ",
+                "  ░╱●●●╲░  ",
+                "  ░●●●●●░  ",
+                "  ░○●●●○░  ",
+                "  ░░░░░░░  "
             ]
         }
         return patterns
@@ -124,32 +191,56 @@ class AnimationEngine:
         canvas = []
         
         # Create soil line
-        soil_line = self.config.canvas_height - 5
+        soil_line = self.config.canvas_height - 8
         
-        # Build canvas
+        # Build canvas with improved soil layers
         for row in range(self.config.canvas_height):
             line = ""
             for col in range(self.config.canvas_width):
                 if row == soil_line:
+                    # Surface soil line
                     line += "~" if col % 2 == 0 else "-"
-                elif row > soil_line:
-                    line += "█" if col % 3 == 0 else "▓"
+                elif row > soil_line and row <= soil_line + 2:
+                    # Upper soil layer (loose topsoil)
+                    char_types = ["▒", "░", "▓"]
+                    line += char_types[(col + row) % 3]
+                elif row > soil_line + 2:
+                    # Lower soil layer (dense subsoil)
+                    char_types = ["█", "▓", "▒"]
+                    line += char_types[(col + row * 2) % 3]
                 else:
                     line += " "
             canvas.append(line)
         
-        # Place potato pattern
+        # Place potato pattern (allow underground growth)
         if pattern and len(pattern) > 0:
-            start_col = self.config.canvas_width // 2 - len(pattern[0]) // 2 if pattern[0] else self.config.canvas_width // 2
-            start_row = soil_line - len(pattern) + 1
+            # Find the longest line for centering
+            max_pattern_width = max(len(line) for line in pattern) if pattern else 0
+            start_col = self.config.canvas_width // 2 - max_pattern_width // 2
+            
+            # Position pattern so foliage is above ground and tubers create underground mound
+            # Only flowers, leaves, and stems should be above ground
+            above_ground_chars = "❀✿❋✾\\|/─━┬┼╷│║┃┏┓╔╗╭╮"
+            above_ground_lines = 0
+            for line in pattern:
+                if any(c in above_ground_chars for c in line):
+                    above_ground_lines += 1
+                else:
+                    break  # Stop counting when we hit underground parts
+            
+            # Position so foliage appears above soil and tubers below
+            start_row = soil_line - above_ground_lines + 1
             
             for i, pattern_line in enumerate(pattern):
-                if start_row + i >= 0 and start_row + i < len(canvas):
-                    row = start_row + i
+                row = start_row + i
+                if 0 <= row < len(canvas):
                     canvas_line = list(canvas[row])
+                    line_start_col = start_col + (max_pattern_width - len(pattern_line)) // 2
+                    
                     for j, char in enumerate(pattern_line):
-                        if start_col + j >= 0 and start_col + j < len(canvas_line):
-                            canvas_line[start_col + j] = char
+                        col = line_start_col + j
+                        if 0 <= col < len(canvas_line) and char != " ":
+                            canvas_line[col] = char
                     canvas[row] = ''.join(canvas_line)
         
         return '\n'.join(canvas)
@@ -230,7 +321,7 @@ def main():
     parser.add_argument("--speed", "-s", type=float, default=2.0, 
                        help="Growth speed (seconds between stages)")
     parser.add_argument("--variety", "-v", default="russet",
-                       help="Potato variety")
+                       help="Potato variety (russet, yukon_gold, red, fingerling)")
     parser.add_argument("--width", "-w", type=int, default=40,
                        help="Canvas width")
     parser.add_argument("--height", type=int, default=20,
