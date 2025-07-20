@@ -321,7 +321,7 @@ def main():
     parser.add_argument("--speed", "-s", type=float, default=2.0, 
                        help="Growth speed (seconds between stages)")
     parser.add_argument("--variety", "-v", default="russet",
-                       help="Potato variety (russet, yukon_gold, red, fingerling)")
+                       help="Potato variety. Available varieties: russet (default), yukon_gold, red, fingerling")
     parser.add_argument("--width", "-w", type=int, default=40,
                        help="Canvas width")
     parser.add_argument("--height", type=int, default=20,
