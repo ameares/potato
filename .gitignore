@@ -126,3 +126,4 @@ dmypy.json
 *.txt
 !requirements.txt
 config.json
+test-script.sh

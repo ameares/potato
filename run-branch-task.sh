@@ -3,7 +3,7 @@
 # Function to show help
 show_help() {
     echo "Usage: $0 [branch-name] [prompt]"
-    echo "No arguments - Interactive mode with worktree chooser"
+    echo "No arguments - Interactive mode"
 }
 
 # Check if no arguments provided - enter interactive mode
@@ -48,12 +48,34 @@ if [ $# -eq 0 ]; then
         exit 1
     fi
     
+    # Ask if user wants Interactive Claude mode
+    if gum confirm "Use Interactive Claude? (removes -p flag for both tasks)"; then
+        INTERACTIVE_MODE=true
+    else
+        INTERACTIVE_MODE=false
+    fi
+    
+    # Ask if user wants to run Preparing PR task (only if not main branch)
+    if [[ "$BRANCH_NAME" != "main" ]]; then
+        if gum confirm "Run Preparing PR task?"; then
+            RUN_PR_TASK=true
+        else
+            RUN_PR_TASK=false
+        fi
+    else
+        RUN_PR_TASK=false
+        echo "Note: Preparing PR task disabled for main branch"
+    fi
+    
 elif [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 <branch-name> <prompt>"
     exit 1
 else
     BRANCH_NAME="$1"
     PROMPT="$2"
+    # Set defaults for non-interactive mode
+    INTERACTIVE_MODE=false
+    RUN_PR_TASK=true
 fi
 
 # Echo the arguments and ask if they are correct
@@ -97,9 +119,21 @@ else
     fi
 fi
 
-gum spin --title "Running Task" --show-output \
--- claude -p "/gtask $PROMPT" --allowedTools "Edit Write MultiEdit" --model sonnet
+# Build the claude command based on interactive mode setting
+if [[ "$INTERACTIVE_MODE" == true ]]; then
+    CLAUDE_CMD="claude \"/gtask $PROMPT\""
+    CLAUDE_PR_CMD="claude \"/ghpr\""
+else
+    CLAUDE_CMD="claude -p \"/gtask $PROMPT\""
+    CLAUDE_PR_CMD="claude -p \"/ghpr\""
+fi
 
-gum spin --title "Preparing PR" --show-output \
--- claude -p "/ghpr"  --model sonnet --allowedTools "Edit Write MultiEdit Bash(git stash:*) Bash(git push:*) Bash(gh pr create:*) Bash(gh pr view:*)"
+gum spin --title "Running Task" --show-output \
+-- $CLAUDE_CMD --allowedTools "Edit Write MultiEdit" --model sonnet
+
+# Only run Preparing PR if requested
+if [[ "$RUN_PR_TASK" == true ]]; then
+    gum spin --title "Preparing PR" --show-output \
+    -- $CLAUDE_PR_CMD --model sonnet --allowedTools "Edit Write MultiEdit Bash(git stash:*) Bash(git push:*) Bash(gh pr create:*) Bash(gh pr view:*)"
+fi
 
